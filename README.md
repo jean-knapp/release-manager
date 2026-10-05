@@ -1,9 +1,9 @@
 # Release Manager
 
 <!-- release-manager:download -->
-[![Download Release Manager 1.0.0](https://img.shields.io/badge/Download-v1.0.0-005FB8?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/jean-knapp/release-manager/releases/latest/download/ReleaseManager-win-Setup.exe)
+[![Download Release Manager 1.0.1](https://img.shields.io/badge/Download-v1.0.1-005FB8?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/jean-knapp/release-manager/releases/download/v1.0.1/ReleaseManager-win-Setup.exe)
 
-Windows installer for Release Manager 1.0.0 · [All releases](https://github.com/jean-knapp/release-manager/releases)
+[ReleaseManager-win-Setup.exe](https://github.com/jean-knapp/release-manager/releases/download/v1.0.1/ReleaseManager-win-Setup.exe) · Windows installer, version 1.0.1
 <!-- /release-manager:download -->
 
 <!-- release-manager:about -->
