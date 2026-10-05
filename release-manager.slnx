@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="../ModernWinForms/ModernWinForms/ModernWinForms.csproj" />
+  <Project Path="release-manager/release-manager.csproj" />
+</Solution>

@@ -1,0 +1,151 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{96B86BD1-FD85-416C-A016-1502331653BB}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>ReleaseManager</RootNamespace>
+    <AssemblyName>Release Manager</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Controls\AppIcon.cs" />
+    <Compile Include="Controls\Chip.cs" />
+    <Compile Include="Controls\CommandButton.cs" />
+    <Compile Include="Controls\Draw.cs" />
+    <Compile Include="Controls\FooterBand.cs" />
+    <Compile Include="Controls\GitHubRepositoryListControl.cs" />
+    <Compile Include="Controls\Icons.cs" />
+    <Compile Include="Controls\LogView.cs" />
+    <Compile Include="Controls\ScrollCornerControl.cs" />
+    <Compile Include="Controls\SettingsCard.cs" />
+    <Compile Include="Controls\StepList.cs" />
+    <Compile Include="Controls\SurfacePanel.cs" />
+    <Compile Include="Controls\TextLabel.cs" />
+    <Compile Include="Controls\ToggleSwitchControl.cs" />
+    <Compile Include="Controls\TokenCheckBox.cs" />
+    <Compile Include="Controls\VirtualListControl.cs" />
+    <Compile Include="Forms\CreateRepositoryDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\CreateRepositoryDialog.Designer.cs">
+      <DependentUpon>CreateRepositoryDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\GitHubRepositoryDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\GitHubRepositoryDialog.Designer.cs">
+      <DependentUpon>GitHubRepositoryDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\MainForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\MainForm.Designer.cs">
+      <DependentUpon>MainForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\MessageDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\MessageDialog.Designer.cs">
+      <DependentUpon>MessageDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\TextInputDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\TextInputDialog.Designer.cs">
+      <DependentUpon>TextInputDialog.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\GitHubSignIn.cs" />
+    <Compile Include="Forms\ReadmeAboutDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\SettingsDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Release\CsProject.cs" />
+    <Compile Include="Release\GitHub.cs" />
+    <Compile Include="Release\GitHubApi.cs" />
+    <Compile Include="Release\Licenses.cs" />
+    <Compile Include="Release\ProcessRunner.cs" />
+    <Compile Include="Release\ReadmeDownload.cs" />
+    <Compile Include="Release\ReleaseDescription.cs" />
+    <Compile Include="Release\ReleasePipeline.cs" />
+    <Compile Include="Release\Toolchain.cs" />
+    <Compile Include="Release\UpdaterSetup.cs" />
+    <Compile Include="Release\VersionStamp.cs" />
+    <Compile Include="Services\AppSettings.cs" />
+    <Compile Include="Services\ClaudeCode.cs" />
+    <Compile Include="Services\JumpListUpdater.cs" />
+    <Compile Include="Services\SingleInstance.cs" />
+    <Compile Include="Services\Theme.cs" />
+    <Compile Include="Views\ProjectView.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\ProjectView.Designer.cs">
+      <DependentUpon>ProjectView.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\WelcomeView.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Tools\ConfuserEx\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Tools\ConfuserEx\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\ModernWinForms\ModernWinForms\ModernWinForms.csproj">
+      <Project>{6c232cb9-5002-48b0-918a-15d05e4a7889}</Project>
+      <Name>ModernWinForms</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
