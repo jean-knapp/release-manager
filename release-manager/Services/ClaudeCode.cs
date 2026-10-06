@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -87,6 +88,11 @@ namespace ReleaseManager.Services
             var args = new List<string>
             {
                 "-p", prompt.ToString(),
+                // The reply is pasted into the README as it is: no chat around it.
+                "--append-system-prompt",
+                "Your final reply is inserted verbatim into a README file. It must start with the first sentence of the " +
+                "description and end with the last feature bullet: no lead-in such as \"Here's the description\", " +
+                "no separator lines, no closing remarks.",
                 "--output-format", "text",
                 // Reading the source is all it may do.
                 "--tools", "Read,Glob,Grep",
@@ -94,9 +100,107 @@ namespace ReleaseManager.Services
                 "--no-session-persistence",
             };
             var output = await RunAsync(executable, args, workingDirectory, string.Empty, cancellation).ConfigureAwait(false);
-            var text = StripFence(output);
+            var text = StripChatter(StripFence(output));
             if (text.Length == 0) throw new InvalidOperationException("Claude returned an empty description.");
             return text;
+        }
+
+        /// <summary>
+        /// Has Claude Code add the update code to a project Release Manager cannot edit by itself (no
+        /// plain Main: WPF's App.xaml, top-level statements, a startup it does not recognise).
+        /// Claude edits the project's files directly, limited to reading and editing them; the
+        /// AppUpdater.cs to add is handed over on standard input, so it is exactly the one Release
+        /// Manager writes. Returns Claude's summary of what it changed.
+        /// </summary>
+        public static async Task<string> SetUpUpdatesAsync(string executable, CsProject project, string velopackVersion, string updaterSource, CancellationToken cancellation)
+        {
+            if (string.IsNullOrEmpty(executable) || !File.Exists(executable))
+                throw new InvalidOperationException("The Claude Code CLI was not found. Install it from https://claude.com/claude-code, then try again.");
+
+            var prompt = new StringBuilder();
+            prompt.Append("Add Velopack auto-update to the C# program \"").Append(project.AssemblyName).Append("\" (project file: ").Append(project.Path).Append("). ");
+            prompt.Append("Make exactly these changes, and nothing else: ");
+            prompt.Append("1. Reference the NuGet package Velopack, version ").Append(velopackVersion).Append(", as a PackageReference in the project file. ");
+            prompt.Append("If the project lists its packages in packages.config, move every package there into the project file as a PackageReference with the same version, remove the <HintPath> references into the packages folder for them, and delete packages.config. ");
+            prompt.Append("2. Make VelopackApp.Build().Run(); (using Velopack;) the very first statement the program runs at startup: first in Main, ");
+            prompt.Append("or for WPF in a static Main you add to App.xaml.cs (mark App.xaml as Page instead of ApplicationDefinition so the generated Main goes away, then call new App().InitializeComponent() and Run()), or first in the top-level statements. ");
+            prompt.Append("3. Add the file AppUpdater.cs next to the startup code with exactly the content given on standard input; change only its namespace line if the project's code uses another namespace. ");
+            prompt.Append("For a project file that lists its source files (<Compile Include=...>), add it there too. ");
+            prompt.Append("4. Call AppUpdater.CheckInBackground(); once the program has started, just before the main window or message loop starts (before Application.Run, or at the end of startup). ");
+            prompt.Append("Do not build, run, commit or reformat anything, and do not touch other files. ");
+            prompt.Append("When done, reply with one short line per file you changed, saying what changed.");
+
+            var args = new List<string>
+            {
+                "-p", prompt.ToString(),
+                "--output-format", "text",
+                // Reading and editing the project's files is all it may do.
+                "--tools", "Read,Glob,Grep,Edit,Write",
+                "--allowedTools", "Read,Glob,Grep,Edit,Write",
+                "--permission-mode", "acceptEdits",
+                "--no-session-persistence",
+            };
+            var output = await RunAsync(executable, args, project.Directory, updaterSource, cancellation).ConfigureAwait(false);
+            return StripFence(output);
+        }
+
+        // A lead-in Claude sometimes writes before the description ("I have enough detail now.
+        // Here's the README description section.") and the closing offer after it.
+        private static readonly Regex LeadIn = new Regex(
+            @"^(i have|i've|i now have|i'll|i will|here('s| is| are)|below is|sure|okay|ok|great|now that|based on|after reading|having read)\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex ClosingRemark = new Regex(
+            @"^(let me know|i can |i could |want me to|would you like|feel free|if you('d| would) like|happy to)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex Rule = new Regex(@"^\s*([-*_])(\s*\1){2,}\s*$", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Removes conversational text around the Markdown: everything before a horizontal rule
+        /// near the top (when it isn't part of the description), lead-in paragraphs, and closing
+        /// remarks after a final rule or at the end.
+        /// </summary>
+        internal static string StripChatter(string text)
+        {
+            var lines = (text ?? string.Empty).Replace("\r\n", "\n").Split('\n').ToList();
+
+            // "Lead-in … \n---\n description": a rule within the first few lines, before any heading.
+            for (int i = 0; i < Math.Min(lines.Count, 6); i++)
+            {
+                if (lines[i].TrimStart().StartsWith("#")) break;
+                if (Rule.IsMatch(lines[i])) { lines.RemoveRange(0, i + 1); break; }
+            }
+
+            // Lead-in paragraphs without a rule.
+            while (true)
+            {
+                Trim(lines);
+                int end = lines.FindIndex(l => l.Trim().Length == 0);
+                if (end <= 0) break;
+                var first = string.Join(" ", lines.Take(end)).Trim();
+                if (!LeadIn.IsMatch(first) || lines.Skip(end).All(l => l.Trim().Length == 0)) break;
+                lines.RemoveRange(0, end);
+            }
+
+            // Closing remarks: after a final rule, or a last paragraph that is an offer.
+            Trim(lines);
+            for (int i = lines.Count - 1; i >= Math.Max(0, lines.Count - 6); i--)
+            {
+                if (lines[i].TrimStart().StartsWith("-") && !Rule.IsMatch(lines[i])) break;   // a bullet: content
+                if (Rule.IsMatch(lines[i])) { lines.RemoveRange(i, lines.Count - i); break; }
+            }
+            Trim(lines);
+            int lastBlank = lines.FindLastIndex(l => l.Trim().Length == 0);
+            if (lastBlank > 0 && ClosingRemark.IsMatch(string.Join(" ", lines.Skip(lastBlank + 1)).Trim()))
+                lines.RemoveRange(lastBlank, lines.Count - lastBlank);
+
+            Trim(lines);
+            return string.Join("\n", lines);
+        }
+
+        private static void Trim(List<string> lines)
+        {
+            while (lines.Count > 0 && lines[0].Trim().Length == 0) lines.RemoveAt(0);
+            while (lines.Count > 0 && lines[lines.Count - 1].Trim().Length == 0) lines.RemoveAt(lines.Count - 1);
         }
 
         private static string StripFence(string output)

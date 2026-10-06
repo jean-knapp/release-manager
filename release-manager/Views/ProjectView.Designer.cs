@@ -19,6 +19,7 @@ namespace ReleaseManager.Views
             this.versionBox = new ModernWinForms.ModernTextBox();
             this.versionHint = new ReleaseManager.Controls.TextLabel();
             this.repoLabel = new ReleaseManager.Controls.TextLabel();
+            this.repoHint = new ReleaseManager.Controls.TextLabel();
             this.repoBox = new ModernWinForms.ModernTextBox();
             this.chooseRepoButton = new ReleaseManager.Controls.CommandButton();
             this.packIdLabel = new ReleaseManager.Controls.TextLabel();
@@ -102,6 +103,7 @@ namespace ReleaseManager.Views
             this.releaseCard.Controls.Add(this.versionHint);
             this.releaseCard.Controls.Add(this.repoLabel);
             this.releaseCard.Controls.Add(this.repoBox);
+            this.releaseCard.Controls.Add(this.repoHint);
             this.releaseCard.Controls.Add(this.chooseRepoButton);
             this.releaseCard.Controls.Add(this.packIdLabel);
             this.releaseCard.Controls.Add(this.packIdBox);
@@ -140,7 +142,15 @@ namespace ReleaseManager.Views
             this.repoLabel.Name = "repoLabel";
             this.repoLabel.SizePx = 14F;
             this.repoLabel.Size = new System.Drawing.Size(200, 20);
-            this.repoLabel.Text = "GitHub repository";
+            this.repoLabel.Text = "Release repository";
+            //
+            // repoHint
+            //
+            this.repoHint.Name = "repoHint";
+            this.repoHint.Role = ReleaseManager.Controls.TextRole.Secondary;
+            this.repoHint.SizePx = 12F;
+            this.repoHint.Size = new System.Drawing.Size(300, 16);
+            this.repoHint.Text = "Where releases are published and the installed program looks for updates.";
             //
             // repoBox
             //
@@ -475,6 +485,7 @@ namespace ReleaseManager.Views
         private ModernWinForms.ModernTextBox versionBox;
         private ReleaseManager.Controls.TextLabel versionHint;
         private ReleaseManager.Controls.TextLabel repoLabel;
+        private ReleaseManager.Controls.TextLabel repoHint;
         private ModernWinForms.ModernTextBox repoBox;
         private ReleaseManager.Controls.CommandButton chooseRepoButton;
         private ReleaseManager.Controls.TextLabel packIdLabel;

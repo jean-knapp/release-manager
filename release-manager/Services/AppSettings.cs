@@ -33,6 +33,7 @@ namespace ReleaseManager.Services
     }
 
     /// <summary>What Release Manager remembers about one program between sessions.</summary>
+    [System.Reflection.Obfuscation(Exclude = true, ApplyToMembers = true)]
     public sealed class ProjectSettings
     {
         /// <summary>The .csproj, by full path.</summary>
@@ -76,6 +77,7 @@ namespace ReleaseManager.Services
     }
 
     /// <summary>User preferences, window state and projects, persisted as XML under %APPDATA%\ReleaseManager.</summary>
+    [System.Reflection.Obfuscation(Exclude = true, ApplyToMembers = true)]
     public sealed class AppSettings
     {
         private static AppSettings _current;

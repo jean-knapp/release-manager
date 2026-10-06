@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using ReleaseManager.Forms;
 using ReleaseManager.Services;
+using Velopack;
 
 namespace ReleaseManager
 {
@@ -14,6 +15,10 @@ namespace ReleaseManager
         [STAThread]
         private static void Main(string[] args)
         {
+            // Velopack's install, update and uninstall hooks: answered and quit before anything else.
+            VelopackApp.Build().Run();
+            Release.Toolchain.RegisterToolAssemblies();
+
             // A project file on the command line comes from the taskbar jump list (or Explorer).
             var projectPath = args.FirstOrDefault(a => a.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) && File.Exists(a));
 
@@ -40,6 +45,7 @@ namespace ReleaseManager
                     });
                 }
                 if (projectPath != null) form.Shown += (s, e) => form.OpenProject(projectPath, true);
+                AppUpdater.CheckInBackground();
                 Application.Run(form);
             }
         }

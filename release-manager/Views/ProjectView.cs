@@ -56,6 +56,10 @@ namespace ReleaseManager.Views
         private bool _failedNeedsToken;
         private bool _signingWarningDismissed;
 
+        /// <summary>The next auto-update setup goes to Claude Code (chosen from the error bar).</summary>
+        private bool _setUpWithClaude;
+        private bool _lastSetUpUsedClaude;
+
         public event EventHandler TitleChanged;
         public event EventHandler StateChanged;
 
@@ -94,6 +98,8 @@ namespace ReleaseManager.Views
             signInToggle.CheckedChanged += SignInToggle_CheckedChanged;
             versionBox.TextChanged += (s, e) => OnFieldChanged(() => _settings.Version = versionBox.Text.Trim());
             repoBox.TextChanged += (s, e) => OnFieldChanged(() => _settings.RepositoryUrl = repoBox.Text.Trim());
+            repoBox.TextChanged += (s, e) => UpdateRepositoryHint();
+            repoHint.MultiLine = true;
             packIdBox.TextChanged += (s, e) => OnFieldChanged(() => _settings.PackId = packIdBox.Text.Trim());
             outputBox.TextChanged += (s, e) => OnFieldChanged(() => _settings.OutputFolder = outputBox.Text.Trim());
 
@@ -159,7 +165,10 @@ namespace ReleaseManager.Views
                 _loading = false;
             }
 
-            if (string.IsNullOrWhiteSpace(settings.RepositoryUrl)) _ = DetectRepositoryAsync();
+            // The source code's own remote: shown next to the release repository, and used to fill it when empty.
+            _sourceRepository = null;
+            UpdateRepositoryHint();
+            _ = DetectRepositoryAsync();
             RefreshCards();
             RefreshSteps();
             LayoutContent();
@@ -236,7 +245,15 @@ namespace ReleaseManager.Views
             if (step == _updatesStep)
             {
                 bool signIn = signInToggle.Checked;
-                return await ExecuteAsync(step, c => _pipeline.SetUpUpdatesAsync(signIn, c), () => { _project = _pipeline.Project; RefreshUpdaterStatus(); });
+                // Claude Code takes over when Release Manager cannot edit the startup itself, or when
+                // asked to after the built-in setup failed.
+                bool withClaude = _setUpWithClaude || UpdatesNeedClaude;
+                _setUpWithClaude = false;
+                Func<CancellationToken, Task> work = withClaude
+                    ? (Func<CancellationToken, Task>)(c => _pipeline.SetUpUpdatesWithClaudeAsync(signIn, c))
+                    : c => _pipeline.SetUpUpdatesAsync(signIn, c);
+                _lastSetUpUsedClaude = withClaude;
+                return await ExecuteAsync(step, work, () => { _project = _pipeline.Project; RefreshUpdaterStatus(); });
             }
             if (step == _buildStep) return await ExecuteAsync(step, BuildAsync, () => _project = _pipeline.Project);
             if (step == _obfuscateStep)
@@ -297,11 +314,19 @@ namespace ReleaseManager.Views
                 logView.Write(LogKind.Warning, "Cancelled.");
                 return false;
             }
+            catch (ClaudeSignInRequiredException ex)
+            {
+                logView.Write(LogKind.Error, "Claude Code is not signed in: " + ex.Message);
+                ClaudeCode.OfferSignIn(FindForm(), ClaudeCode.FindExecutable(), ex.Message);
+                return false;
+            }
             catch (Exception ex)
             {
                 logView.Write(LogKind.Error, ex.Message);
+                // The project may be half set up; read it again so the row says what is missing.
+                if (step == _updatesStep) RefreshUpdaterStatus();
                 _failed = step;
-                _failedMessage = ex.Message;
+                _failedMessage = Services.Text.Printable(ex.Message);
                 _failedAt = DateTime.Now;
                 ShowError();
                 return false;
@@ -386,6 +411,11 @@ namespace ReleaseManager.Views
                     : "Update code is in the project · AppUpdater.cs points to " + GitHub.FullName(_updaterStatus.UpdaterRepositoryUrl), "Run again", true);
                 s.Time = Time(state.UpdaterAt);
             }
+            else if (UpdatesNeedClaude)
+            {
+                // Release Manager cannot edit this startup itself: Claude Code can.
+                Set(s, StepStatus.Idle, reason, "Set up with Claude", true);
+            }
             else
             {
                 Set(s, StepStatus.Idle, reason, "Run", _updaterStatus != null && _updaterStatus.Blockers.Count == 0);
@@ -407,7 +437,9 @@ namespace ReleaseManager.Views
             if (!obfuscate) Set(s, StepStatus.Skipped, "Skipped · obfuscation is off", "Run", false);
             else if (built && state.Obfuscated)
             {
-                Set(s, StepStatus.Done, "Obfuscated with " + protections + " protection" + (protections == 1 ? string.Empty : "s"), "Run again", true);
+                Set(s, StepStatus.Done, "Obfuscated with " + protections + " protection" + (protections == 1 ? string.Empty : "s")
+                    + (state.NamesKept > 0 ? " · names of " + state.NamesKept + " saved type" + (state.NamesKept == 1 ? string.Empty : "s") + " kept" : string.Empty),
+                    "Run again", true);
                 s.Time = Time(state.ObfuscatedAt);
             }
             else if (!built) Set(s, StepStatus.Idle, "Build first", "Obfuscate", false);
@@ -568,13 +600,23 @@ namespace ReleaseManager.Views
             errorBar.Message = _failedNeedsToken
                 ? "No GitHub token was found. Sign in to GitHub with git or add a personal access token, then retry."
                 : _failedMessage.Replace("\r\n", "\n").Replace("\n\n", " ").Replace('\n', ' ');
-            errorBar.ActionText = _failedNeedsToken ? "Add token…" : string.Empty;
+            errorBar.ActionText = _failedNeedsToken ? "Add token…" : OffersClaude ? "Set up with Claude" : string.Empty;
             errorBar.Visible = true;
             LayoutContent();
         }
 
+        /// <summary>The built-in auto-update setup failed: Claude Code can try instead.</summary>
+        private bool OffersClaude => _failed == _updatesStep && !_lastSetUpUsedClaude;
+
         private async void errorBar_ActionClick(object sender, EventArgs e)
         {
+            if (OffersClaude)
+            {
+                if (_busy) return;
+                _setUpWithClaude = true;
+                await RunAsync(_updatesStep);
+                return;
+            }
             if (!_failedNeedsToken) return;
             if (await GitHubSignIn.AddTokenAsync(FindForm()) == null) return;
             logView.Write(LogKind.Info, "GitHub token saved. Retry the publish step to use it.");
@@ -716,11 +758,44 @@ namespace ReleaseManager.Views
             }
         }
 
+        // The GitHub repository the project's source code is pushed to (git origin); null when none.
+        private string _sourceRepository;
+
+        /// <summary>
+        /// Reads the source code's git remote. It fills an empty release repository (most projects
+        /// publish where their code lives), but never replaces one that was set: releases can go to
+        /// another repository, e.g. a public one for a private codebase.
+        /// </summary>
         private async Task DetectRepositoryAsync()
         {
             if (_project == null) return;
-            var url = await GitHub.RepositoryFromGitAsync(_project.Directory);
+            var project = _project;
+            var url = await GitHub.RepositoryFromGitAsync(project.Directory);
+            if (project != _project) return;
+            _sourceRepository = url;
             if (url != null && string.IsNullOrWhiteSpace(repoBox.Text)) repoBox.Text = url;
+            UpdateRepositoryHint();
+        }
+
+        /// <summary>Says what the release repository is for, and how it relates to the source code's remote.</summary>
+        private void UpdateRepositoryHint()
+        {
+            var release = GitHub.NormalizeRepositoryUrl(repoBox.Text);
+            var source  = _sourceRepository;
+            string text;
+            if (release == null)
+                text = "Where releases are published and the installed program looks for updates." +
+                       (source != null ? " The source code is in " + GitHub.FullName(source) + "." : string.Empty);
+            else if (source == null)
+                text = "Releases, the README download button and update checks use this repository.";
+            else if (string.Equals(release, source, StringComparison.OrdinalIgnoreCase))
+                text = "The same repository as the source code (git origin). Choose another to publish releases separately.";
+            else
+                text = "Releases are published here, apart from the source code in " + GitHub.FullName(source) +
+                       ". The README, LICENSE and update checks use this repository.";
+            if (repoHint.Text == text) return;
+            repoHint.Text = text;
+            PerformLayout();
         }
 
         // ------------------------------------------------------------------ update code
@@ -731,6 +806,15 @@ namespace ReleaseManager.Views
             try { _updaterStatus = UpdaterSetup.Inspect(_project); }
             catch { _updaterStatus = null; }
         }
+
+        /// <summary>
+        /// The update code is missing and Release Manager cannot add it by itself: there is no plain
+        /// Main to edit, or its packages are in a form it does not handle. A library is not a case
+        /// for Claude either: it has nothing to update.
+        /// </summary>
+        private bool UpdatesNeedClaude =>
+            _updaterStatus != null && !_updaterStatus.HasOwnUpdateCode && !_updaterStatus.IsInstalled
+            && _updaterStatus.Blockers.Count > 0 && _project != null && _project.IsExecutable;
 
         /// <summary>Whether the project's update code matches the settings; when not, why not.</summary>
         private bool UpdaterIsCurrent(out string reason)
@@ -750,7 +834,9 @@ namespace ReleaseManager.Views
             }
             if (!status.IsInstalled)
             {
-                reason = "Adds the update code to the project";
+                reason = status.MigratesPackagesConfig
+                    ? "Moves the NuGet packages from packages.config to PackageReference, then adds the update code"
+                    : "Adds the update code to the project";
                 return false;
             }
             var wanted = GitHub.NormalizeRepositoryUrl(repoBox.Text);
@@ -875,7 +961,10 @@ namespace ReleaseManager.Views
             repoLabel.SetBounds(16, fy, inner, 20); fy += 26;
             chooseRepoButton.Width = chooseRepoButton.PreferredWidth;
             repoBox.SetBounds(16, fy, inner - chooseRepoButton.Width - 8, 32);
-            chooseRepoButton.SetBounds(16 + inner - chooseRepoButton.Width, fy, chooseRepoButton.Width, 32); fy += 32 + 16;
+            chooseRepoButton.SetBounds(16 + inner - chooseRepoButton.Width, fy, chooseRepoButton.Width, 32); fy += 38;
+            int hintHeight = TextRenderer.MeasureText(repoHint.Text, Fonts.Ui(repoHint.SizePx), new Size(inner, int.MaxValue),
+                                                      TextFormatFlags.WordBreak | TextFormatFlags.NoPadding).Height;
+            repoHint.SetBounds(16, fy, inner, Math.Max(16, hintHeight)); fy += repoHint.Height + 16;
             packIdLabel.SetBounds(16, fy, inner, 20); fy += 26;
             packIdBox.SetBounds(16, fy, inner, 32); fy += 32 + 16;
             outputLabel.SetBounds(16, fy, inner, 20); fy += 26;

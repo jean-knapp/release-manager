@@ -65,7 +65,9 @@ namespace ReleaseManager.Controls
                 try { BeginInvoke((Action)(() => Write(kind, text))); } catch (InvalidOperationException) { }
                 return;
             }
-            foreach (var raw in (text ?? string.Empty).Replace("\r", string.Empty).Split('\n'))
+            // Tool output can carry obfuscated names full of bidirectional marks, which would turn
+            // the line (and the step status built from it) back to front.
+            foreach (var raw in Services.Text.Printable(text ?? string.Empty).Replace("\r", string.Empty).Split('\n'))
             {
                 _lines.Add(new LogLine { Kind = kind, Text = raw, Time = DateTime.Now });
                 LineWritten?.Invoke(this, new LogLineEventArgs(kind, raw));

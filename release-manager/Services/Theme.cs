@@ -5,6 +5,7 @@ using ModernWinForms.Enums;
 
 namespace ReleaseManager.Services
 {
+    [System.Reflection.Obfuscation(Exclude = true, ApplyToMembers = true)]
     public enum ThemeMode
     {
         Dark,
