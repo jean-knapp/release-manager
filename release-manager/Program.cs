@@ -19,6 +19,13 @@ namespace ReleaseManager
             VelopackApp.Build().Run();
             Release.Toolchain.RegisterToolAssemblies();
 
+            // --release: the whole release from the command line, without the window (Services\CommandLine.cs)
+            if (CommandLine.Wants(args))
+            {
+                Environment.ExitCode = CommandLine.Run(args);
+                return;
+            }
+
             // A project file on the command line comes from the taskbar jump list (or Explorer).
             var projectPath = args.FirstOrDefault(a => a.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) && File.Exists(a));
 

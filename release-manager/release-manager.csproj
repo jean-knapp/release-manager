@@ -123,6 +123,7 @@
     <Compile Include="Release\UpdaterSetup.cs" />
     <Compile Include="Release\VersionStamp.cs" />
     <Compile Include="Services\AppSettings.cs" />
+    <Compile Include="Services\CommandLine.cs" />
     <Compile Include="Services\ClaudeCode.cs" />
     <Compile Include="Services\JumpListUpdater.cs" />
     <Compile Include="Services\SingleInstance.cs" />
